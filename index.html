@@ -30,8 +30,7 @@
     <div id="title-ui" class="absolute text-center z-10 bg-black/90 p-10 rounded-2xl border-4 border-yellow-500 max-w-lg hidden">
         <h1 id="title-header" class="text-4xl font-bold mb-6 text-yellow-400">RICE SHOOT! 2</h1>
         <p id="title-desc" class="text-sm text-gray-300 leading-relaxed mb-8">
-            아래에서 위로 올라오는 적과 블록을 파괴하세요!<br>
-            [67] 아이템을 획득하면 무적 모드가 됩니다!<br><br>
+            보다 더 강력해진 슈팅 게임! sf2026 사운드 엔진의 독특한 사운드와 독특한 시스템!<br><br>
             [이동] 방향키 / WASD / 화면 버튼<br>
             [공격] Space Bar / FIRE 버튼<br>
             <span class="text-xs text-cyan-400 mt-2 block">※ 15초간 입력이 없으면 데모 플레이가 재생됩니다.</span>
@@ -74,7 +73,7 @@
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         let audioCtx;
-        let bassToneBuffer, manePulseBuffer, shortNoiseBuffer, pulse6Buffer, pulse12Buffer, pulse25Buffer, pulse50Buffer, whiteNoiseBuffer;
+        let bassToneBuffer, manePulseBuffer, shortNoiseBuffer, pulse6Buffer, pulse25Buffer, pulse50Buffer, whiteNoiseBuffer;
         let drumPlayers;
         let gameState = "TAP_WAIT";
         let idleTimer = 0;
@@ -96,7 +95,6 @@
         const spaceBassSeq = ["A2", "E2", "C2", "G2", "F2", "C2", "D2", "E2"];
         const spaceManeSeq = ["E5", null, "A5", "C5", "G5", null, "E5", "A5"];
         const spacePulse6Seq = [null, "C5", null, "E5", null, "G5", null, "A5"];
-        const spacePulse12Seq = ["A5", null, "G5", null, "E5", null, "C5", null];
         const spacePulse25Seq = ["C3", "E2", "G2", "A2", "C3", "E2", "G2", "A2"];
         const spaceNoiseSeq = [true, false, false, true, false, true, false, false];
         const spaceShortNoiseSeq = [false, false, true, false, false, false, true, false];
@@ -118,7 +116,6 @@
                 manePulseBuffer = await loadBuf('mane_pulse.wav');
                 shortNoiseBuffer = await loadBuf('short_noise.wav');
                 pulse6Buffer = await loadBuf('pulse_6.25.wav');
-                pulse12Buffer = await loadBuf('mane_pulse.wav');
                 pulse25Buffer = await loadBuf('pulse_25.wav');
                 pulse50Buffer = await loadBuf('pulse_50.wav');
                 whiteNoiseBuffer = await loadBuf('whitenoise.wav');
@@ -151,19 +148,19 @@
                 const source = audioCtx.createBufferSource();
                 source.buffer = pulse50Buffer;
                 
-                source.playbackRate.setValueAtTime(80.0 / 80.0, audioCtx.currentTime);
-                source.playbackRate.exponentialRampToValueAtTime(55.0 / 80.0, audioCtx.currentTime + 0.12);
+                source.playbackRate.setValueAtTime(320.0 / 80.0, audioCtx.currentTime);
+                source.playbackRate.exponentialRampToValueAtTime(140.0 / 80.0, audioCtx.currentTime + 0.08);
 
                 const gainNode = audioCtx.createGain();
-                gainNode.gain.setValueAtTime(0.7, audioCtx.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+                gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
 
                 source.connect(gainNode);
                 gainNode.connect(audioCtx.destination);
                 source.start(audioCtx.currentTime);
-                source.stop(audioCtx.currentTime + 0.12);
+                source.stop(audioCtx.currentTime + 0.08);
             } catch(e) {
-                playCustomSample(pulse50Buffer, 80.0, 70.0, 0.12, 0.7);
+                playCustomSample(pulse50Buffer, 80.0, 180.0, 0.08, 0.5);
             }
         }
 
@@ -231,11 +228,8 @@
                     const p6Note = spacePulse6Seq[idx];
                     if (p6Note) playCustomSample(pulse6Buffer, 10.0, noteFreqs[p6Note] || 523.25, 0.12, 0.3);
 
-                    const p12Note = spacePulse12Seq[idx];
-                    if (p12Note) playCustomSample(pulse12Buffer, 20.0, noteFreqs[p12Note] || 587.33, 0.12, 0.3);
-
-                    const p25Note = spacePulse25Seq[idx];
-                    playCustomSample(pulse25Buffer, 46.0, noteFreqs[p25Note] || 130.81, 0.2, 0.35);
+                    const p25Note = mNote;
+                    if (p25Note) playCustomSample(pulse25Buffer, 46.0, (noteFreqs[p25Note] || 659.25) * 0.5, 0.2, 0.3);
 
                     const p50Note = spaceBassSeq[(idx + 2) % spaceBassSeq.length];
                     playCustomSample(pulse50Buffer, 80.0, noteFreqs[p50Note] || 98.0, 0.15, 0.3);
@@ -389,7 +383,8 @@
 
                     if (player.x < item.x + 36 && player.x + player.w > item.x && player.y < item.y + 36 && player.y + player.h > item.y) {
                         player.invincible = true;
-                        let invTime = Math.max(1500, 6000 - (stage - 1) * 100);
+                        let dropChanceFactor = Math.max(0.2, 1.0 - (stage - 1) * 0.02);
+                        let invTime = Math.max(1500, dropChanceFactor * 6000);
                         player.invincibleTimer = invTime;
                         playSixSevenSound();
                         items.splice(i, 1);
