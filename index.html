@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Rice Shoot! 2</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
@@ -74,7 +73,6 @@
         const ctx = canvas.getContext('2d');
         let audioCtx;
         let bassToneBuffer, manePulseBuffer, shortNoiseBuffer, pulse6Buffer, pulse25Buffer, pulse50Buffer, whiteNoiseBuffer;
-        let drumPlayers;
         let gameState = "TAP_WAIT";
         let idleTimer = 0;
 
@@ -103,7 +101,10 @@
 
         async function loadAudioBuffers() {
             try {
-                audioCtx = Tone.context.rawContext;
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') {
+                    await audioCtx.resume();
+                }
                 const loadBuf = async (url) => {
                     try {
                         const resp = await fetch(url);
@@ -148,11 +149,11 @@
                 const source = audioCtx.createBufferSource();
                 source.buffer = pulse50Buffer;
                 
-                source.playbackRate.setValueAtTime(320.0 / 80.0, audioCtx.currentTime);
-                source.playbackRate.exponentialRampToValueAtTime(140.0 / 80.0, audioCtx.currentTime + 0.08);
+                source.playbackRate.setValueAtTime(260.0 / 80.0, audioCtx.currentTime);
+                source.playbackRate.linearRampToValueAtTime(140.0 / 80.0, audioCtx.currentTime + 0.08);
 
                 const gainNode = audioCtx.createGain();
-                gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.4, audioCtx.currentTime);
                 gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
 
                 source.connect(gainNode);
@@ -160,7 +161,7 @@
                 source.start(audioCtx.currentTime);
                 source.stop(audioCtx.currentTime + 0.08);
             } catch(e) {
-                playCustomSample(pulse50Buffer, 80.0, 180.0, 0.08, 0.5);
+                playCustomSample(pulse50Buffer, 80.0, 180.0, 0.08, 0.4);
             }
         }
 
@@ -172,6 +173,41 @@
         function playSixSevenSound() {
             playCustomSample(pulse50Buffer, 80.0, 450.0, 0.7, 0.8);
             playCustomSample(manePulseBuffer, 26.0, 520.0, 0.5, 0.5);
+        }
+
+        function playRiceItemSound() {
+            playCustomSample(pulse6Buffer, 10.0, 400.0, 0.2, 0.7);
+            playCustomSample(manePulseBuffer, 26.0, 600.0, 0.2, 0.5);
+        }
+
+        function playBombTriggerSound() {
+            if (!whiteNoiseBuffer || !audioCtx) return;
+            try {
+                const now = audioCtx.currentTime;
+                
+                const clickSource = audioCtx.createBufferSource();
+                clickSource.buffer = whiteNoiseBuffer;
+                clickSource.playbackRate.value = 50.0;
+                const clickGain = audioCtx.createGain();
+                clickGain.gain.setValueAtTime(0.8, now);
+                clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+                clickSource.connect(clickGain);
+                clickGain.connect(audioCtx.destination);
+                clickSource.start(now);
+                clickSource.stop(now + 0.04);
+
+                const boomSource = audioCtx.createBufferSource();
+                boomSource.buffer = whiteNoiseBuffer;
+                boomSource.playbackRate.setValueAtTime(2.0, now + 0.05);
+                boomSource.playbackRate.linearRampToValueAtTime(0.5, now + 0.8);
+                const boomGain = audioCtx.createGain();
+                boomGain.gain.setValueAtTime(1.0, now + 0.05);
+                boomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+                boomSource.connect(boomGain);
+                boomGain.connect(audioCtx.destination);
+                boomSource.start(now + 0.05);
+                boomSource.stop(now + 0.8);
+            } catch(e) {}
         }
 
         function playStageClearSound() {
@@ -188,6 +224,14 @@
         function playGameOverSound() {
             playCustomSample(whiteNoiseBuffer, 1.0, 5.0, 1.2, 1.0);
             playCustomSample(bassToneBuffer, 12.5, 20.0, 1.2, 0.9);
+        }
+
+        function triggerVibrationPattern() {
+            if (navigator.vibrate) {
+                try {
+                    navigator.vibrate([100, 50, 300, 200, 70]);
+                } catch(e) {}
+            }
         }
 
         function startCustomMusicLoops() {
@@ -223,13 +267,17 @@
                     playCustomSample(bassToneBuffer, 12.5, noteFreqs[bNote] || 82.41, 0.25, 0.6);
 
                     const mNote = spaceManeSeq[idx];
-                    if (mNote) playCustomSample(manePulseBuffer, 26.0, noteFreqs[mNote] || 659.25, 0.15, 0.35);
+                    if (mNote) {
+                        const mHz = noteFreqs[mNote] || 659.25;
+                        playCustomSample(manePulseBuffer, 26.0, mHz, 0.15, 0.35);
+                        const p25Note = spacePulse25Seq[idx];
+                        if (p25Note) {
+                            playCustomSample(pulse25Buffer, 46.0, (noteFreqs[p25Note] || 400.0) * (mHz / 659.25), 0.2, 0.25);
+                        }
+                    }
 
                     const p6Note = spacePulse6Seq[idx];
                     if (p6Note) playCustomSample(pulse6Buffer, 10.0, noteFreqs[p6Note] || 523.25, 0.12, 0.3);
-
-                    const p25Note = mNote;
-                    if (p25Note) playCustomSample(pulse25Buffer, 46.0, (noteFreqs[p25Note] || 659.25) * 0.5, 0.2, 0.3);
 
                     const p50Note = spaceBassSeq[(idx + 2) % spaceBassSeq.length];
                     playCustomSample(pulse50Buffer, 80.0, noteFreqs[p50Note] || 98.0, 0.15, 0.3);
@@ -239,7 +287,7 @@
                     }
 
                     if (spaceShortNoiseSeq[idx]) {
-                        playCustomSample(shortNoiseBuffer, 15.0, 350.0, 0.06, 0.4);
+                        playCustomSample(shortNoiseBuffer, 3.0, 350.0, 0.06, 0.4);
                     }
 
                     spaceStep++;
@@ -247,33 +295,16 @@
             }, intervalMs);
         }
 
-        let drumStep = 0;
-        const customDrumLoop = new Tone.Loop((time) => {
-            if (gameState === "TITLE_SCREEN" || gameState === "DEMO" || gameState === "PLAYING") {
-                const patterns = ["drum1", null, "drum2", null, "drum3", "drum1", "drum4", null, "drum1", "drum2", "drum3", null, "drum2", null, "drum5", "drum3"];
-                const trigger = patterns[drumStep % patterns.length];
-                if (trigger && drumPlayers && drumPlayers.loaded) drumPlayers.player(trigger).start(time);
-                drumStep++;
-            }
-        }, "8n");
-
         let player = { x: 280, y: 680, w: 42, h: 42, invincible: false, invincibleTimer: 0, lives: 5 };
         let bullets = [], enemies = [], blocks = [], items = [], score = 0, keys = {}, shootCooldown = 0;
         let stage = 1;
         let killCount = 0;
 
         document.getElementById('tap-ui').addEventListener('click', async () => {
-            await Tone.start();
             await loadAudioBuffers();
-
-            drumPlayers = new Tone.Players({ drum1: "rice jump drum.wav", drum2: "rice jump drum2.wav", drum3: "rice jump drum3.wav", drum4: "rice jump drum4.wav", drum5: "rice jump drum5.wav" }).toDestination();
-
             if (navigator.vibrate) navigator.vibrate(250);
             
-            Tone.Transport.bpm.value = 135;
             startCustomMusicLoops();
-            customDrumLoop.start(0); 
-            Tone.Transport.start();
 
             document.getElementById('tap-ui').style.display = 'none';
             document.getElementById('title-ui').style.display = 'block';
@@ -366,27 +397,75 @@
 
                 items.forEach((item, i) => {
                     item.y += 1.8 * speedFactor;
-                    ctx.beginPath();
-                    ctx.arc(item.x + 18, item.y + 18, 18, 0, Math.PI * 2);
-                    ctx.fillStyle = "#06b6d4";
-                    ctx.fill();
-                    ctx.lineWidth = 3;
-                    ctx.strokeStyle = "#ffffff";
-                    ctx.stroke();
-                    ctx.closePath();
+                    
+                    if (item.type === 'sixseven') {
+                        ctx.beginPath();
+                        ctx.arc(item.x + 18, item.y + 18, 18, 0, Math.PI * 2);
+                        ctx.fillStyle = "#06b6d4";
+                        ctx.fill();
+                        ctx.lineWidth = 3;
+                        ctx.strokeStyle = "#ffffff";
+                        ctx.stroke();
+                        ctx.closePath();
 
-                    ctx.fillStyle = "#ffffff";
-                    ctx.font = "bold 13px 'Press Start 2P', monospace";
-                    ctx.textAlign = "center";
-                    ctx.textBaseline = "middle";
-                    ctx.fillText("67", item.x + 18, item.y + 18);
+                        ctx.fillStyle = "#ffffff";
+                        ctx.font = "bold 13px 'Press Start 2P', monospace";
+                        ctx.textAlign = "center";
+                        ctx.textBaseline = "middle";
+                        ctx.fillText("67", item.x + 18, item.y + 18);
+                    } else if (item.type === 'rice') {
+                        ctx.beginPath();
+                        ctx.arc(item.x + 18, item.y + 18, 18, 0, Math.PI * 2);
+                        ctx.fillStyle = "#10b981";
+                        ctx.fill();
+                        ctx.lineWidth = 3;
+                        ctx.strokeStyle = "#ffffff";
+                        ctx.stroke();
+                        ctx.closePath();
+
+                        ctx.fillStyle = "#ffffff";
+                        ctx.font = "bold 11px 'Press Start 2P', monospace";
+                        ctx.textAlign = "center";
+                        ctx.textBaseline = "middle";
+                        ctx.fillText("RICE", item.x + 18, item.y + 18);
+                    } else if (item.type === 'bomb') {
+                        ctx.beginPath();
+                        ctx.arc(item.x + 18, item.y + 18, 18, 0, Math.PI * 2);
+                        ctx.fillStyle = "#dc2626";
+                        ctx.fill();
+                        ctx.lineWidth = 3;
+                        ctx.strokeStyle = "#ffffff";
+                        ctx.stroke();
+                        ctx.closePath();
+
+                        ctx.fillStyle = "#ffffff";
+                        ctx.font = "bold 16px 'Press Start 2P', monospace";
+                        ctx.textAlign = "center";
+                        ctx.textBaseline = "middle";
+                        ctx.fillText("!", item.x + 18, item.y + 18);
+                    }
 
                     if (player.x < item.x + 36 && player.x + player.w > item.x && player.y < item.y + 36 && player.y + player.h > item.y) {
-                        player.invincible = true;
-                        let dropChanceFactor = Math.max(0.2, 1.0 - (stage - 1) * 0.02);
-                        let invTime = Math.max(1500, dropChanceFactor * 6000);
-                        player.invincibleTimer = invTime;
-                        playSixSevenSound();
+                        if (item.type === 'sixseven') {
+                            player.invincible = true;
+                            let dropChanceFactor = Math.max(0.2, 1.0 - (stage - 1) * 0.02);
+                            player.invincibleTimer = Math.max(1500, dropChanceFactor * 6000);
+                            playSixSevenSound();
+                        } else if (item.type === 'rice') {
+                            player.lives = Math.min(9, player.lives + 1);
+                            document.getElementById('life-val').innerText = player.lives;
+                            playRiceItemSound();
+                        } else if (item.type === 'bomb') {
+                            playBombTriggerSound();
+                            triggerVibrationPattern();
+                            player.lives = 0;
+                            document.getElementById('life-val').innerText = player.lives;
+                            playGameOverSound();
+                            gameState = "GAMEOVER";
+                            document.getElementById('title-ui').style.display = 'block';
+                            document.getElementById('title-header').innerText = "GAME OVER";
+                            document.getElementById('title-desc').innerHTML = "최종 점수: " + score + "<br>도달 스테이지: " + stage;
+                        }
                         items.splice(i, 1);
                     }
                     if (item.y > 820) items.splice(i, 1);
@@ -399,10 +478,20 @@
                             b.hp--;
                             playHitSound();
                             if (b.hp <= 0) {
-                                let dropChance = Math.max(0.15, 1.0 - (stage - 1) * 0.02);
-                                if (Math.random() < dropChance) {
-                                    items.push({ x: b.x + 10, y: b.y + 10 });
+                                let stFactor = (stage - 1) * 0.02;
+                                let sixSevenChance = Math.max(0.05, 0.3 - stFactor);
+                                let riceChance = Math.max(0.03, 0.15 - stFactor);
+                                let bombChance = Math.min(0.7, 0.2 + stFactor * 1.5);
+
+                                let rand = Math.random();
+                                if (rand < sixSevenChance) {
+                                    items.push({ x: b.x + 10, y: b.y + 10, type: 'sixseven' });
+                                } else if (rand < sixSevenChance + riceChance) {
+                                    items.push({ x: b.x + 10, y: b.y + 10, type: 'rice' });
+                                } else if (rand < sixSevenChance + riceChance + bombChance) {
+                                    items.push({ x: b.x + 10, y: b.y + 10, type: 'bomb' });
                                 }
+
                                 blocks.splice(bi, 1);
                                 score += 100 * stage;
                                 document.getElementById('score-val').innerText = score;
@@ -457,7 +546,9 @@
                     if ((keys[" "] || player.invincible) && shootCooldown <= 0) { 
                         bullets.push({ x: player.x + 16, y: player.y }); 
                         playGunShoot();
-                        if (navigator.vibrate) navigator.vibrate(100);
+                        if (navigator.vibrate) {
+                            try { navigator.vibrate(40); } catch(e) {}
+                        }
                         shootCooldown = fireInterval; 
                     }
                     if (shootCooldown > 0) shootCooldown--;
