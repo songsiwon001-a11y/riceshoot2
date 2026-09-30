@@ -74,7 +74,7 @@
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         let audioCtx;
-        let bassToneBuffer, manePulseBuffer, shortNoiseBuffer, pulse6Buffer, pulse25Buffer, pulse50Buffer, whiteNoiseBuffer;
+        let bassToneBuffer, manePulseBuffer, shortNoiseBuffer, pulse6Buffer, pulse12Buffer, pulse25Buffer, pulse50Buffer, whiteNoiseBuffer;
         let drumPlayers;
         let gameState = "TAP_WAIT";
         let idleTimer = 0;
@@ -93,6 +93,16 @@
         let melodyStep = 0;
         let melodyIntervalId = null;
 
+        const spaceBassSeq = ["A2", "E2", "C2", "G2", "F2", "C2", "D2", "E2"];
+        const spaceManeSeq = ["E5", null, "A5", "C5", "G5", null, "E5", "A5"];
+        const spacePulse6Seq = [null, "C5", null, "E5", null, "G5", null, "A5"];
+        const spacePulse12Seq = ["A5", null, "G5", null, "E5", null, "C5", null];
+        const spacePulse25Seq = ["C3", "E2", "G2", "A2", "C3", "E2", "G2", "A2"];
+        const spaceNoiseSeq = [true, false, false, true, false, true, false, false];
+        const spaceShortNoiseSeq = [false, false, true, false, false, false, true, false];
+        let spaceStep = 0;
+        let spaceMusicIntervalId = null;
+
         async function loadAudioBuffers() {
             try {
                 audioCtx = Tone.context.rawContext;
@@ -108,6 +118,7 @@
                 manePulseBuffer = await loadBuf('mane_pulse.wav');
                 shortNoiseBuffer = await loadBuf('short_noise.wav');
                 pulse6Buffer = await loadBuf('pulse_6.25%.wav');
+                pulse12Buffer = await loadBuf('mane_pulse.wav');
                 pulse25Buffer = await loadBuf('pulse_25%.wav');
                 pulse50Buffer = await loadBuf('pulse_50%.wav');
                 whiteNoiseBuffer = await loadBuf('whitenoise.wav');
@@ -134,32 +145,25 @@
             } catch(e) {}
         }
 
-        function playBassTone(targetHz) { playCustomSample(bassToneBuffer, 12.5, targetHz, 0.35, 0.7); }
-        function playManePulse(targetHz) { playCustomSample(manePulseBuffer, 26.0, targetHz, 0.15, 0.4); }
-
         function playGunShoot() {
-            let startHz = 220.0 + Math.random() * 40;
-            let endHz = 40.0;
-            if (audioCtx) {
-                try {
-                    const source = audioCtx.createBufferSource();
-                    source.buffer = pulse25Buffer;
-                    source.playbackRate.setValueAtTime(startHz / 46.0, audioCtx.currentTime);
-                    source.playbackRate.exponentialRampToValueAtTime(endHz / 46.0, audioCtx.currentTime + 0.12);
+            if (!pulse50Buffer || !audioCtx) return;
+            try {
+                const source = audioCtx.createBufferSource();
+                source.buffer = pulse50Buffer;
+                
+                source.playbackRate.setValueAtTime(800.0 / 80.0, audioCtx.currentTime);
+                source.playbackRate.exponentialRampToValueAtTime(60.0 / 80.0, audioCtx.currentTime + 0.18);
 
-                    const gainNode = audioCtx.createGain();
-                    gainNode.gain.setValueAtTime(0.6, audioCtx.currentTime);
-                    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+                const gainNode = audioCtx.createGain();
+                gainNode.gain.setValueAtTime(0.7, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.18);
 
-                    source.connect(gainNode);
-                    gainNode.connect(audioCtx.destination);
-                    source.start(audioCtx.currentTime);
-                    source.stop(audioCtx.currentTime + 0.12);
-                } catch(e) {
-                    playCustomSample(pulse25Buffer, 46.0, 110.0, 0.1, 0.6);
-                }
-            } else {
-                playCustomSample(pulse25Buffer, 46.0, 110.0, 0.1, 0.6);
+                source.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                source.start(audioCtx.currentTime);
+                source.stop(audioCtx.currentTime + 0.18);
+            } catch(e) {
+                playCustomSample(pulse50Buffer, 80.0, 150.0, 0.15, 0.7);
             }
         }
 
@@ -192,24 +196,59 @@
         function startCustomMusicLoops() {
             if (bassIntervalId) clearInterval(bassIntervalId);
             if (melodyIntervalId) clearInterval(melodyIntervalId);
+            if (spaceMusicIntervalId) clearInterval(spaceMusicIntervalId);
 
             const intervalMs = (60 / 135) * 1000 * 0.5;
 
             bassIntervalId = setInterval(() => {
-                if (gameState === "TITLE_SCREEN" || gameState === "DEMO" || gameState === "PLAYING") {
+                if (gameState === "TITLE_SCREEN" || gameState === "DEMO") {
                     const note = bassNotesSeq[bassStep % bassNotesSeq.length];
-                    playBassTone(noteFreqs[note] || 110.0);
+                    playCustomSample(bassToneBuffer, 12.5, noteFreqs[note] || 110.0, 0.35, 0.7);
                     bassStep++;
                 }
             }, intervalMs);
 
             melodyIntervalId = setInterval(() => {
-                if (gameState === "TITLE_SCREEN" || gameState === "DEMO" || gameState === "PLAYING") {
+                if (gameState === "TITLE_SCREEN" || gameState === "DEMO") {
                     const note = melodyNotesSeq[melodyStep % melodyNotesSeq.length];
                     if (note) {
-                        playManePulse(noteFreqs[note] || 659.25);
+                        playCustomSample(manePulseBuffer, 26.0, noteFreqs[note] || 659.25, 0.15, 0.4);
                     }
                     melodyStep++;
+                }
+            }, intervalMs);
+
+            spaceMusicIntervalId = setInterval(() => {
+                if (gameState === "PLAYING") {
+                    const idx = spaceStep % spaceBassSeq.length;
+                    
+                    const bNote = spaceBassSeq[idx];
+                    playCustomSample(bassToneBuffer, 12.5, noteFreqs[bNote] || 82.41, 0.25, 0.6);
+
+                    const mNote = spaceManeSeq[idx];
+                    if (mNote) playCustomSample(manePulseBuffer, 26.0, noteFreqs[mNote] || 659.25, 0.15, 0.35);
+
+                    const p6Note = spacePulse6Seq[idx];
+                    if (p6Note) playCustomSample(pulse6Buffer, 10.0, noteFreqs[p6Note] || 523.25, 0.12, 0.3);
+
+                    const p12Note = spacePulse12Seq[idx];
+                    if (p12Note) playCustomSample(pulse12Buffer, 20.0, noteFreqs[p12Note] || 587.33, 0.12, 0.3);
+
+                    const p25Note = spacePulse25Seq[idx];
+                    playCustomSample(pulse25Buffer, 46.0, noteFreqs[p25Note] || 130.81, 0.2, 0.35);
+
+                    const p50Note = spaceBassSeq[(idx + 2) % spaceBassSeq.length];
+                    playCustomSample(pulse50Buffer, 80.0, noteFreqs[p50Note] || 98.0, 0.15, 0.3);
+
+                    if (spaceNoiseSeq[idx]) {
+                        playCustomSample(whiteNoiseBuffer, 1.0, 25.0, 0.08, 0.2);
+                    }
+
+                    if (spaceShortNoiseSeq[idx]) {
+                        playCustomSample(shortNoiseBuffer, 15.0, 350.0, 0.06, 0.4);
+                    }
+
+                    spaceStep++;
                 }
             }, intervalMs);
         }
@@ -263,7 +302,7 @@
 
         function initializeGame() {
             player.lives = 5; score = 0; bullets = []; enemies = []; blocks = []; items = []; player.invincible = false;
-            stage = 1; killCount = 0;
+            stage = 1; killCount = 0; spaceStep = 0;
             document.getElementById('life-val').innerText = player.lives;
             document.getElementById('score-val').innerText = score;
             document.getElementById('stage-val').innerText = stage;
@@ -464,7 +503,7 @@
                     gameState = "TITLE_SCREEN";
                     document.getElementById('title-ui').style.display = 'block';
                     document.getElementById('title-header').innerText = "RICE SHOOT! 2";
-                    document.getElementById('title-desc').innerHTML = "보다 더 강력해진 슈팅 게임! sf2026 사운드 엔진의 독특한 사운드와 독특한 시스템!<br><br>[이동] 방향키 / WASD / 화면 버튼<br>[공격] Space Bar / FIRE 버튼<br><span class='text-xs text-cyan-400 mt-2 block'>※ 15초간 입력이동 / WASD / 화면 버튼<br>[공격] Space Bar / FIRE 버튼<br><span class='text-xs text-cyan-400 mt-2 block'>※ 15초간 입력이 없으면 데모 플레이가 재생됩니다.</span>";
+                    document.getElementById('title-desc').innerHTML = "보다 더 강력해진 슈팅 게임! sf2026 사운드 엔진의 독특한 사운드와 독특한 시스템!<br><br>[이동] 방향키 / WASD / 화면 버튼<br>[공격] Space Bar / FIRE 버튼<br><span class='text-xs text-cyan-400 mt-2 block'>※ 15초간 입력이 없으면 데모 플레이가 재생됩니다.</span>";
                     idleTimer = 0;
                     return;
                 }
