@@ -28,8 +28,8 @@
     </div>
 
     <div id="title-ui" class="absolute text-center z-10 bg-black/90 p-10 rounded-2xl border-4 border-yellow-500 max-w-lg hidden">
-        <h1 class="text-4xl font-bold mb-6 text-yellow-400">RICE SHOOT! 2</h1>
-        <p class="text-sm text-gray-300 leading-relaxed mb-8">
+        <h1 id="title-header" class="text-4xl font-bold mb-6 text-yellow-400">RICE SHOOT! 2</h1>
+        <p id="title-desc" class="text-sm text-gray-300 leading-relaxed mb-8">
             아래에서 위로 올라오는 적과 블록을 파괴하세요!<br>
             [67] 아이템을 획득하면 무적 모드가 됩니다!<br><br>
             [이동] 방향키 / WASD / 화면 버튼<br>
@@ -43,10 +43,12 @@
     </div>
 
     <div class="w-full max-w-[600px] flex justify-between items-center mb-3 hud px-2 text-xs">
-        <div class="flex gap-4">
+        <div class="flex gap-3">
             <span class="text-red-500">LIFE: <span id="life-val">5</span></span>
             <span class="text-yellow-400">SCORE: <span id="score-val">0</span></span>
+            <span class="text-cyan-400">STAGE: <span id="stage-val">1</span>/40</span>
         </div>
+        <div class="text-emerald-400">KILLS: <span id="kills-val">0</span>/50</div>
     </div>
 
     <canvas id="canvas" width="600" height="800"></canvas>
@@ -136,8 +138,29 @@
         function playManePulse(targetHz) { playCustomSample(manePulseBuffer, 26.0, targetHz, 0.15, 0.4); }
 
         function playGunShoot() {
-            playCustomSample(shortNoiseBuffer, 3.0, 180.0, 0.08, 0.6);
-            playCustomSample(pulse25Buffer, 20.0, 110.0, 0.08, 0.4);
+            let startHz = 220.0 + Math.random() * 40;
+            let endHz = 40.0;
+            if (audioCtx) {
+                try {
+                    const source = audioCtx.createBufferSource();
+                    source.buffer = pulse25Buffer;
+                    source.playbackRate.setValueAtTime(startHz / 46.0, audioCtx.currentTime);
+                    source.playbackRate.exponentialRampToValueAtTime(endHz / 46.0, audioCtx.currentTime + 0.12);
+
+                    const gainNode = audioCtx.createGain();
+                    gainNode.gain.setValueAtTime(0.6, audioCtx.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+
+                    source.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    source.start(audioCtx.currentTime);
+                    source.stop(audioCtx.currentTime + 0.12);
+                } catch(e) {
+                    playCustomSample(pulse25Buffer, 46.0, 110.0, 0.1, 0.6);
+                }
+            } else {
+                playCustomSample(pulse25Buffer, 46.0, 110.0, 0.1, 0.6);
+            }
         }
 
         function playHitSound() {
@@ -148,6 +171,12 @@
         function playSixSevenSound() {
             playCustomSample(pulse50Buffer, 80.0, 450.0, 0.7, 0.8);
             playCustomSample(manePulseBuffer, 26.0, 520.0, 0.5, 0.5);
+        }
+
+        function playStageClearSound() {
+            playCustomSample(pulse50Buffer, 80.0, 600.0, 0.4, 0.8);
+            playCustomSample(pulse25Buffer, 46.0, 800.0, 0.4, 0.7);
+            playCustomSample(manePulseBuffer, 26.0, 900.0, 0.5, 0.6);
         }
 
         function playDeathSound() {
@@ -197,6 +226,8 @@
 
         let player = { x: 280, y: 680, w: 42, h: 42, invincible: false, invincibleTimer: 0, lives: 5 };
         let bullets = [], enemies = [], blocks = [], items = [], score = 0, keys = {}, shootCooldown = 0;
+        let stage = 1;
+        let killCount = 0;
 
         document.getElementById('tap-ui').addEventListener('click', async () => {
             await Tone.start();
@@ -213,6 +244,9 @@
 
             document.getElementById('tap-ui').style.display = 'none';
             document.getElementById('title-ui').style.display = 'block';
+            document.getElementById('title-header').innerText = "RICE SHOOT! 2";
+            document.getElementById('title-desc').innerHTML = "보다 더 강력해진 슈팅 게임! sf2026 사운드 엔진의 독특한 사운드와 독특한 시스템!<br><br>[이동] 방향키 / WASD / 화면 버튼<br>[공격] Space Bar / FIRE 버튼<br><span class='text-xs text-cyan-400 mt-2 block'>※ 15초간 입력이 없으면 데모 플레이가 재생됩니다.</span>";
+            
             gameState = "TITLE_SCREEN";
             idleTimer = 0;
             initializeGame();
@@ -229,8 +263,11 @@
 
         function initializeGame() {
             player.lives = 5; score = 0; bullets = []; enemies = []; blocks = []; items = []; player.invincible = false;
+            stage = 1; killCount = 0;
             document.getElementById('life-val').innerText = player.lives;
             document.getElementById('score-val').innerText = score;
+            document.getElementById('stage-val').innerText = stage;
+            document.getElementById('kills-val').innerText = killCount;
             for (let i = 0; i < 4; i++) blocks.push({ x: 50 + Math.random() * 500, y: -100 - Math.random() * 200, hp: 4 });
         }
 
@@ -269,6 +306,8 @@
             }
 
             if (gameState === "PLAYING" || gameState === "DEMO") {
+                let speedFactor = 1.0 + (stage - 1) * 0.05;
+
                 if (gameState === "PLAYING") {
                     if (keys["ArrowUp"] || keys["w"]) player.y = Math.max(10, player.y - 6.5);
                     if (keys["ArrowDown"] || keys["s"]) player.y = Math.min(740, player.y + 6.5);
@@ -294,14 +333,14 @@
                 });
 
                 blocks.forEach((b, i) => { 
-                    b.y += 1.5; 
+                    b.y += 1.5 * speedFactor; 
                     ctx.fillStyle = "#eab308"; 
                     ctx.fillRect(b.x, b.y, 55, 55); 
                     if(b.y > 820) blocks.splice(i, 1);
                 });
 
                 items.forEach((item, i) => {
-                    item.y += 1.8;
+                    item.y += 1.8 * speedFactor;
                     ctx.beginPath();
                     ctx.arc(item.x + 18, item.y + 18, 18, 0, Math.PI * 2);
                     ctx.fillStyle = "#06b6d4";
@@ -319,7 +358,8 @@
 
                     if (player.x < item.x + 36 && player.x + player.w > item.x && player.y < item.y + 36 && player.y + player.h > item.y) {
                         player.invincible = true;
-                        player.invincibleTimer = 6000;
+                        let invTime = Math.max(1500, 6000 - (stage - 1) * 100);
+                        player.invincibleTimer = invTime;
                         playSixSevenSound();
                         items.splice(i, 1);
                     }
@@ -333,9 +373,12 @@
                             b.hp--;
                             playHitSound();
                             if (b.hp <= 0) {
-                                items.push({ x: b.x + 10, y: b.y + 10 });
+                                let dropChance = Math.max(0.15, 1.0 - (stage - 1) * 0.02);
+                                if (Math.random() < dropChance) {
+                                    items.push({ x: b.x + 10, y: b.y + 10 });
+                                }
                                 blocks.splice(bi, 1);
-                                score += 100;
+                                score += 100 * stage;
                                 document.getElementById('score-val').innerText = score;
                             }
                         }
@@ -343,7 +386,7 @@
                 });
 
                 enemies.forEach((e, i) => {
-                    e.y += 3;
+                    e.y += 3 * speedFactor;
                     ctx.fillStyle = "#ef4444";
                     ctx.fillRect(e.x, e.y, 30, 30);
                     if (player.x < e.x + 30 && player.x + 42 > e.x && player.y < e.y + 30 && player.y + 42 > e.y) {
@@ -355,17 +398,33 @@
                                 playGameOverSound();
                                 gameState = "GAMEOVER";
                                 document.getElementById('title-ui').style.display = 'block';
-                                document.querySelector('#title-ui h1').innerText = "GAME OVER";
+                                document.getElementById('title-header').innerText = "GAME OVER";
+                                document.getElementById('title-desc').innerHTML = "최종 점수: " + score + "<br>도달 스테이지: " + stage;
                             } else {
                                 playDeathSound();
                             }
                         }
                     }
-                    if (e.y > 820) enemies.splice(i, 1);
+                    if (e.y > 820) {
+                        enemies.splice(i, 1);
+                        killCount++;
+                        document.getElementById('kills-val').innerText = killCount;
+                        if (killCount >= 50) {
+                            killCount = 0;
+                            stage++;
+                            if (stage > 40) {
+                                stage = 1;
+                            }
+                            document.getElementById('stage-val').innerText = stage;
+                            document.getElementById('kills-val').innerText = killCount;
+                            playStageClearSound();
+                        }
+                    }
                 });
 
-                if (Math.random() < 0.02) enemies.push({ x: Math.random() * 550, y: -30 });
-                if (blocks.length < 4 && Math.random() < 0.02) blocks.push({ x: Math.random() * 500, y: -60, hp: 4 });
+                let spawnRate = Math.max(0.008, 0.02 - (stage - 1) * 0.0003);
+                if (Math.random() < spawnRate) enemies.push({ x: Math.random() * 550, y: -30 });
+                if (blocks.length < 4 && Math.random() < spawnRate) blocks.push({ x: Math.random() * 500, y: -60, hp: 4 });
 
                 if (gameState === "PLAYING") {
                     let fireInterval = player.invincible ? 4 : 12;
@@ -386,6 +445,8 @@
             if (gameState === "DEMO") {
                 gameState = "TITLE_SCREEN";
                 document.getElementById('title-ui').style.display = 'block';
+                document.getElementById('title-header').innerText = "RICE SHOOT! 2";
+                document.getElementById('title-desc').innerHTML = "보다 더 강력해진 슈팅 게임! sf2026 사운드 엔진의 독특한 사운드와 독특한 시스템!<br><br>[이동] 방향키 / WASD / 화면 버튼<br>[공격] Space Bar / FIRE 버튼<br><span class='text-xs text-cyan-400 mt-2 block'>※ 15초간 입력이 없으면 데모 플레이가 재생됩니다.</span>";
                 idleTimer = 0;
                 return;
             }
@@ -402,6 +463,8 @@
                 if (gameState === "DEMO") {
                     gameState = "TITLE_SCREEN";
                     document.getElementById('title-ui').style.display = 'block';
+                    document.getElementById('title-header').innerText = "RICE SHOOT! 2";
+                    document.getElementById('title-desc').innerHTML = "보다 더 강력해진 슈팅 게임! sf2026 사운드 엔진의 독특한 사운드와 독특한 시스템!<br><br>[이동] 방향키 / WASD / 화면 버튼<br>[공격] Space Bar / FIRE 버튼<br><span class='text-xs text-cyan-400 mt-2 block'>※ 15초간 입력이동 / WASD / 화면 버튼<br>[공격] Space Bar / FIRE 버튼<br><span class='text-xs text-cyan-400 mt-2 block'>※ 15초간 입력이 없으면 데모 플레이가 재생됩니다.</span>";
                     idleTimer = 0;
                     return;
                 }
