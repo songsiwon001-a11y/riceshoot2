@@ -19,7 +19,7 @@
     <div id="tap-ui" class="absolute text-center z-20 bg-black/95 p-10 rounded-2xl border-4 border-emerald-500 max-w-lg cursor-pointer">
         <h1 class="text-4xl font-bold mb-6 text-emerald-400">RICE SHOOT! 2</h1>
         <p class="text-sm text-gray-300 leading-relaxed mb-8">
-            화면을 터치하여 오디오 에셋을 로드하고<br>타이틀 화면으로 진입하세요!
+            화면을 터치하여 사운드 엔진을 활성화하고<br>타이틀 화면으로 진입하세요!
         </p>
         <div id="tap-btn" class="px-10 py-5 bg-emerald-600 text-white text-xl font-bold rounded-xl border-b-8 border-emerald-800 animate-pulse inline-block">
             TAP TO START
@@ -31,7 +31,7 @@
         <h1 class="text-4xl font-bold mb-6 text-yellow-400">RICE SHOOT! 2</h1>
         <p class="text-sm text-gray-300 leading-relaxed mb-8">
             아래에서 위로 올라오는 적과 블록을 파괴하세요!<br>
-            동그란 [67] 아이템을 획득하면 무적이 됩니다!<br><br>
+            [67] 아이템을 획득하면 무적 모드가 됩니다!<br><br>
             [이동] 방향키 / WASD / 화면 버튼<br>
             [공격] Space Bar / FIRE 버튼<br>
             <span class="text-xs text-cyan-400 mt-2 block">※ 15초간 입력이 없으면 데모 플레이가 재생됩니다.</span>
@@ -94,7 +94,6 @@
         async function loadAudioBuffers() {
             try {
                 audioCtx = Tone.context.rawContext;
-                
                 const loadBuf = async (url) => {
                     try {
                         const resp = await fetch(url);
@@ -118,7 +117,7 @@
             try {
                 const source = audioCtx.createBufferSource();
                 source.buffer = buffer;
-                const playbackRate = Math.max(0.1, targetHz / baseHz);
+                const playbackRate = Math.max(0.05, targetHz / baseHz);
                 source.playbackRate.value = playbackRate;
 
                 const duration = Math.min((buffer.duration / playbackRate), maxDuration);
@@ -135,10 +134,31 @@
 
         function playBassTone(targetHz) { playCustomSample(bassToneBuffer, 12.5, targetHz, 0.35, 0.7); }
         function playManePulse(targetHz) { playCustomSample(manePulseBuffer, 26.0, targetHz, 0.15, 0.4); }
-        function playGunShoot() { playCustomSample(shortNoiseBuffer, 3.0, 150.0, 0.1, 0.6); }
-        function playHitSound() { playCustomSample(pulse6Buffer, 10.0, 40.0, 0.2, 0.7); }
-        function playSixSevenSound() { playCustomSample(pulse50Buffer, 80.0, 400.0, 0.8, 0.8); }
-        function playDeathSound() { playCustomSample(whiteNoiseBuffer, 1.0, 10.0, 0.5, 0.9); }
+
+        function playGunShoot() {
+            playCustomSample(shortNoiseBuffer, 3.0, 180.0, 0.08, 0.6);
+            playCustomSample(pulse25Buffer, 20.0, 110.0, 0.08, 0.4);
+        }
+
+        function playHitSound() {
+            playCustomSample(pulse6Buffer, 10.0, 60.0, 0.12, 0.7);
+            playCustomSample(whiteNoiseBuffer, 1.0, 25.0, 0.1, 0.3);
+        }
+
+        function playSixSevenSound() {
+            playCustomSample(pulse50Buffer, 80.0, 450.0, 0.7, 0.8);
+            playCustomSample(manePulseBuffer, 26.0, 520.0, 0.5, 0.5);
+        }
+
+        function playDeathSound() {
+            playCustomSample(whiteNoiseBuffer, 1.0, 8.0, 0.6, 0.9);
+            playCustomSample(bassToneBuffer, 12.5, 30.0, 0.6, 0.8);
+        }
+
+        function playGameOverSound() {
+            playCustomSample(whiteNoiseBuffer, 1.0, 5.0, 1.2, 1.0);
+            playCustomSample(bassToneBuffer, 12.5, 20.0, 1.2, 0.9);
+        }
 
         function startCustomMusicLoops() {
             if (bassIntervalId) clearInterval(bassIntervalId);
@@ -331,11 +351,13 @@
                         if (!player.invincible && gameState === "PLAYING") {
                             player.lives--;
                             document.getElementById('life-val').innerText = player.lives;
-                            playDeathSound();
                             if (player.lives <= 0) {
+                                playGameOverSound();
                                 gameState = "GAMEOVER";
                                 document.getElementById('title-ui').style.display = 'block';
                                 document.querySelector('#title-ui h1').innerText = "GAME OVER";
+                            } else {
+                                playDeathSound();
                             }
                         }
                     }
