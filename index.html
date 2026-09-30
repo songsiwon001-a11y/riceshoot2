@@ -151,19 +151,19 @@
                 const source = audioCtx.createBufferSource();
                 source.buffer = pulse50Buffer;
                 
-                source.playbackRate.setValueAtTime(800.0 / 80.0, audioCtx.currentTime);
-                source.playbackRate.exponentialRampToValueAtTime(60.0 / 80.0, audioCtx.currentTime + 0.18);
+                source.playbackRate.setValueAtTime(80.0 / 80.0, audioCtx.currentTime);
+                source.playbackRate.exponentialRampToValueAtTime(55.0 / 80.0, audioCtx.currentTime + 0.12);
 
                 const gainNode = audioCtx.createGain();
                 gainNode.gain.setValueAtTime(0.7, audioCtx.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.18);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
 
                 source.connect(gainNode);
                 gainNode.connect(audioCtx.destination);
                 source.start(audioCtx.currentTime);
-                source.stop(audioCtx.currentTime + 0.18);
+                source.stop(audioCtx.currentTime + 0.12);
             } catch(e) {
-                playCustomSample(pulse50Buffer, 80.0, 150.0, 0.15, 0.7);
+                playCustomSample(pulse50Buffer, 80.0, 70.0, 0.12, 0.7);
             }
         }
 
@@ -317,6 +317,7 @@
                 idleTimer++;
                 if (idleTimer > 900) {
                     gameState = "DEMO";
+                    document.getElementById('title-ui').style.display = 'none';
                     initializeGame();
                 }
 
@@ -333,15 +334,6 @@
                     shootCooldown = 12;
                 }
                 if (shootCooldown > 0) shootCooldown--;
-
-                for (let k in keys) {
-                    if (keys[k]) {
-                        gameState = "TITLE_SCREEN";
-                        document.getElementById('title-ui').style.display = 'block';
-                        idleTimer = 0;
-                        return;
-                    }
-                }
             }
 
             if (gameState === "PLAYING" || gameState === "DEMO") {
@@ -480,18 +472,27 @@
             requestAnimationFrame(gameLoop);
         }
 
-        window.addEventListener('keydown', e => { 
+        const returnToTitleFromDemo = () => {
             if (gameState === "DEMO") {
                 gameState = "TITLE_SCREEN";
                 document.getElementById('title-ui').style.display = 'block';
                 document.getElementById('title-header').innerText = "RICE SHOOT! 2";
                 document.getElementById('title-desc').innerHTML = "보다 더 강력해진 슈팅 게임! sf2026 사운드 엔진의 독특한 사운드와 독특한 시스템!<br><br>[이동] 방향키 / WASD / 화면 버튼<br>[공격] Space Bar / FIRE 버튼<br><span class='text-xs text-cyan-400 mt-2 block'>※ 15초간 입력이 없으면 데모 플레이가 재생됩니다.</span>";
                 idleTimer = 0;
-                return;
+                return true;
             }
+            return false;
+        };
+
+        window.addEventListener('keydown', e => { 
+            if (returnToTitleFromDemo()) return;
             if(e.key === " ") keys[" "] = true; else keys[e.key] = true; 
         });
         window.addEventListener('keyup', e => { if(e.key === " ") keys[" "] = false; else keys[e.key] = false; });
+
+        canvas.addEventListener('pointerdown', () => {
+            returnToTitleFromDemo();
+        });
 
         const setupBtn = (id, key) => {
             const el = document.getElementById(id);
@@ -499,14 +500,7 @@
             
             const activate = (e) => {
                 e.preventDefault();
-                if (gameState === "DEMO") {
-                    gameState = "TITLE_SCREEN";
-                    document.getElementById('title-ui').style.display = 'block';
-                    document.getElementById('title-header').innerText = "RICE SHOOT! 2";
-                    document.getElementById('title-desc').innerHTML = "보다 더 강력해진 슈팅 게임! sf2026 사운드 엔진의 독특한 사운드와 독특한 시스템!<br><br>[이동] 방향키 / WASD / 화면 버튼<br>[공격] Space Bar / FIRE 버튼<br><span class='text-xs text-cyan-400 mt-2 block'>※ 15초간 입력이 없으면 데모 플레이가 재생됩니다.</span>";
-                    idleTimer = 0;
-                    return;
-                }
+                if (returnToTitleFromDemo()) return;
                 keys[key] = true;
                 el.classList.add('active-touch');
             };
