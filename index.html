@@ -73,6 +73,10 @@
         const ctx = canvas.getContext('2d');
         let audioCtx;
         let bassToneBuffer, manePulseBuffer, shortNoiseBuffer, pulse6Buffer, pulse25Buffer, pulse50Buffer, whiteNoiseBuffer;
+        let gameOverAudioBuffer = null;
+        let stageClearAudioBuffer = null;
+        let helloAudioBuffer = null;
+        let sixSevenAudioBuffer = null;
         let gameState = "TAP_WAIT";
         let idleTimer = 0;
 
@@ -120,6 +124,10 @@
                 pulse25Buffer = await loadBuf('pulse_25.wav');
                 pulse50Buffer = await loadBuf('pulse_50.wav');
                 whiteNoiseBuffer = await loadBuf('whitenoise.wav');
+                gameOverAudioBuffer = await loadBuf('game_over.mp3');
+                stageClearAudioBuffer = await loadBuf('stage_clear.mp3');
+                helloAudioBuffer = await loadBuf('안녕하세요.mp3');
+                sixSevenAudioBuffer = await loadBuf('six seven.mp3');
             } catch (e) {}
         }
 
@@ -143,17 +151,30 @@
             } catch(e) {}
         }
 
+        function playExternalAudioBuffer(buffer) {
+            if (!buffer || !audioCtx) return;
+            try {
+                const source = audioCtx.createBufferSource();
+                source.buffer = buffer;
+                const gainNode = audioCtx.createGain();
+                gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime);
+                source.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                source.start(audioCtx.currentTime);
+            } catch(e) {}
+        }
+
         function playGunShoot() {
             if (!pulse50Buffer || !audioCtx) return;
             try {
                 const source = audioCtx.createBufferSource();
                 source.buffer = pulse50Buffer;
                 
-                source.playbackRate.setValueAtTime(260.0 / 80.0, audioCtx.currentTime);
+                source.playbackRate.setValueAtTime(320.0 / 80.0, audioCtx.currentTime);
                 source.playbackRate.linearRampToValueAtTime(140.0 / 80.0, audioCtx.currentTime + 0.08);
 
                 const gainNode = audioCtx.createGain();
-                gainNode.gain.setValueAtTime(0.4, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
                 gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
 
                 source.connect(gainNode);
@@ -161,7 +182,7 @@
                 source.start(audioCtx.currentTime);
                 source.stop(audioCtx.currentTime + 0.08);
             } catch(e) {
-                playCustomSample(pulse50Buffer, 80.0, 180.0, 0.08, 0.4);
+                playCustomSample(pulse50Buffer, 80.0, 200.0, 0.08, 0.3);
             }
         }
 
@@ -173,6 +194,7 @@
         function playSixSevenSound() {
             playCustomSample(pulse50Buffer, 80.0, 450.0, 0.7, 0.8);
             playCustomSample(manePulseBuffer, 26.0, 520.0, 0.5, 0.5);
+            playExternalAudioBuffer(sixSevenAudioBuffer);
         }
 
         function playRiceItemSound() {
@@ -210,10 +232,19 @@
             } catch(e) {}
         }
 
+        function triggerBombVibration() {
+            if (navigator.vibrate) {
+                try {
+                    navigator.vibrate([100, 50, 300, 200, 70, 50, 300, 200, 70, 50, 300, 200, 70]);
+                } catch(e) {}
+            }
+        }
+
         function playStageClearSound() {
             playCustomSample(pulse50Buffer, 80.0, 600.0, 0.4, 0.8);
-            playCustomSample(pulse25Buffer, 46.0, 800.0, 0.4, 0.7);
+            playCustomSample(pulse25Buffer, 11.5, 800.0, 0.4, 0.7);
             playCustomSample(manePulseBuffer, 26.0, 900.0, 0.5, 0.6);
+            playExternalAudioBuffer(stageClearAudioBuffer);
         }
 
         function playDeathSound() {
@@ -224,14 +255,7 @@
         function playGameOverSound() {
             playCustomSample(whiteNoiseBuffer, 1.0, 5.0, 1.2, 1.0);
             playCustomSample(bassToneBuffer, 12.5, 20.0, 1.2, 0.9);
-        }
-
-        function triggerVibrationPattern() {
-            if (navigator.vibrate) {
-                try {
-                    navigator.vibrate([100, 50, 300, 200, 70]);
-                } catch(e) {}
-            }
+            playExternalAudioBuffer(gameOverAudioBuffer);
         }
 
         function startCustomMusicLoops() {
@@ -272,7 +296,7 @@
                         playCustomSample(manePulseBuffer, 26.0, mHz, 0.15, 0.35);
                         const p25Note = spacePulse25Seq[idx];
                         if (p25Note) {
-                            playCustomSample(pulse25Buffer, 46.0, (noteFreqs[p25Note] || 400.0) * (mHz / 659.25), 0.2, 0.25);
+                            playCustomSample(pulse25Buffer, 11.5, (noteFreqs[p25Note] || 400.0) * (mHz / 659.25), 0.2, 0.25);
                         }
                     }
 
@@ -302,7 +326,12 @@
 
         document.getElementById('tap-ui').addEventListener('click', async () => {
             await loadAudioBuffers();
-            if (navigator.vibrate) navigator.vibrate(250);
+            if (navigator.vibrate) {
+                try {
+                    navigator.vibrate([100, 50, 100]);
+                } catch(e) {}
+            }
+            playExternalAudioBuffer(helloAudioBuffer);
             
             startCustomMusicLoops();
 
@@ -457,7 +486,7 @@
                             playRiceItemSound();
                         } else if (item.type === 'bomb') {
                             playBombTriggerSound();
-                            triggerVibrationPattern();
+                            triggerBombVibration();
                             player.lives = 0;
                             document.getElementById('life-val').innerText = player.lives;
                             playGameOverSound();
@@ -479,17 +508,17 @@
                             playHitSound();
                             if (b.hp <= 0) {
                                 let stFactor = (stage - 1) * 0.02;
-                                let sixSevenChance = Math.max(0.05, 0.3 - stFactor);
-                                let riceChance = Math.max(0.03, 0.15 - stFactor);
-                                let bombChance = Math.min(0.7, 0.2 + stFactor * 1.5);
+                                let bombChance = Math.min(0.85, 0.35 + stFactor * 1.5);
+                                let sixSevenChance = Math.max(0.01, (0.25 - stFactor) * 0.7);
+                                let riceChance = Math.max(0.01, (0.15 - stFactor) * 0.5);
 
                                 let rand = Math.random();
-                                if (rand < sixSevenChance) {
-                                    items.push({ x: b.x + 10, y: b.y + 10, type: 'sixseven' });
-                                } else if (rand < sixSevenChance + riceChance) {
-                                    items.push({ x: b.x + 10, y: b.y + 10, type: 'rice' });
-                                } else if (rand < sixSevenChance + riceChance + bombChance) {
+                                if (rand < bombChance) {
                                     items.push({ x: b.x + 10, y: b.y + 10, type: 'bomb' });
+                                } else if (rand < bombChance + sixSevenChance) {
+                                    items.push({ x: b.x + 10, y: b.y + 10, type: 'sixseven' });
+                                } else if (rand < bombChance + sixSevenChance + riceChance) {
+                                    items.push({ x: b.x + 10, y: b.y + 10, type: 'rice' });
                                 }
 
                                 blocks.splice(bi, 1);
