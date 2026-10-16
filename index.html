@@ -77,6 +77,10 @@
         let stageClearAudioBuffer = null;
         let helloAudioBuffer = null;
         let sixSevenAudioBuffer = null;
+        let finalScoreAudioBuffer = null;
+        let isNotNumAudioBuffer = null;
+        let pointIsAudioBuffer = null;
+        let numAudioBuffers = {};
         let gameState = "TAP_WAIT";
         let idleTimer = 0;
 
@@ -128,6 +132,13 @@
                 stageClearAudioBuffer = await loadBuf('stage_clear.mp3');
                 helloAudioBuffer = await loadBuf('안녕하세요.mp3');
                 sixSevenAudioBuffer = await loadBuf('six seven.mp3');
+                finalScoreAudioBuffer = await loadBuf('당신의_최종_점수는.mp3');
+                isNotNumAudioBuffer = await loadBuf('숫자가 아님.mp3');
+                pointIsAudioBuffer = await loadBuf('점입니다.mp3');
+
+                for (let n of [1,2,3,4,5,6,7,8,9,10,100,1000,10000]) {
+                    numAudioBuffers[n] = await loadBuf(n + '.mp3');
+                }
             } catch (e) {}
         }
 
@@ -151,7 +162,7 @@
             } catch(e) {}
         }
 
-        function playExternalAudioBuffer(buffer) {
+        function playExternalAudioBuffer(buffer, onEnded = null) {
             if (!buffer || !audioCtx) return;
             try {
                 const source = audioCtx.createBufferSource();
@@ -160,8 +171,13 @@
                 gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime);
                 source.connect(gainNode);
                 gainNode.connect(audioCtx.destination);
+                if (onEnded) {
+                    source.onended = onEnded;
+                }
                 source.start(audioCtx.currentTime);
-            } catch(e) {}
+            } catch(e) {
+                if (onEnded) onEnded();
+            }
         }
 
         function playGunShoot() {
@@ -170,19 +186,19 @@
                 const source = audioCtx.createBufferSource();
                 source.buffer = pulse50Buffer;
                 
-                source.playbackRate.setValueAtTime(320.0 / 80.0, audioCtx.currentTime);
-                source.playbackRate.linearRampToValueAtTime(140.0 / 80.0, audioCtx.currentTime + 0.08);
+                source.playbackRate.setValueAtTime(450.0 / 80.0, audioCtx.currentTime);
+                source.playbackRate.linearRampToValueAtTime(120.0 / 80.0, audioCtx.currentTime + 0.12);
 
                 const gainNode = audioCtx.createGain();
                 gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
 
                 source.connect(gainNode);
                 gainNode.connect(audioCtx.destination);
                 source.start(audioCtx.currentTime);
-                source.stop(audioCtx.currentTime + 0.08);
+                source.stop(audioCtx.currentTime + 0.12);
             } catch(e) {
-                playCustomSample(pulse50Buffer, 80.0, 200.0, 0.08, 0.3);
+                playCustomSample(pulse50Buffer, 80.0, 200.0, 0.12, 0.3);
             }
         }
 
@@ -252,10 +268,72 @@
             playCustomSample(bassToneBuffer, 12.5, 30.0, 0.6, 0.8);
         }
 
-        function playGameOverSound() {
+        function playScoreNumberSequence(scoreVal) {
+            if (scoreVal > 99999999) {
+                playExternalAudioBuffer(isNotNumAudioBuffer, () => {
+                    setTimeout(() => playExternalAudioBuffer(pointIsAudioBuffer), 200);
+                });
+                return;
+            }
+
+            let parts = [];
+            let n = scoreVal;
+
+            if (n === 0) {
+                parts.push(0);
+            } else {
+                let units = [
+                    {val: 10000, bufKey: 10000},
+                    {val: 1000, bufKey: 1000},
+                    {val: 100, bufKey: 100},
+                    {val: 10, bufKey: 10}
+                ];
+
+                for (let unit of units) {
+                    if (n >= unit.val) {
+                        let count = Math.floor(n / unit.val);
+                        n %= unit.val;
+                        if (count > 1 || unit.val >= 100) {
+                            parts.push(count);
+                        }
+                        parts.push(unit.bufKey);
+                    }
+                }
+                if (n > 0) {
+                    parts.push(n);
+                }
+            }
+
+            let index = 0;
+            const playNextPart = () => {
+                if (index < parts.length) {
+                    let key = parts[index];
+                    let buf = key === 0 ? numAudioBuffers[0] : numAudioBuffers[key];
+                    index++;
+                    playExternalAudioBuffer(buf, () => {
+                        setTimeout(playNextPart, 150);
+                    });
+                } else {
+                    setTimeout(() => {
+                        playExternalAudioBuffer(pointIsAudioBuffer);
+                    }, 150);
+                }
+            };
+            playNextPart();
+        }
+
+        function playGameOverSequence() {
             playCustomSample(whiteNoiseBuffer, 1.0, 5.0, 1.2, 1.0);
             playCustomSample(bassToneBuffer, 12.5, 20.0, 1.2, 0.9);
-            playExternalAudioBuffer(gameOverAudioBuffer);
+            playExternalAudioBuffer(gameOverAudioBuffer, () => {
+                setTimeout(() => {
+                    playExternalAudioBuffer(finalScoreAudioBuffer, () => {
+                        setTimeout(() => {
+                            playScoreNumberSequence(score);
+                        }, 300);
+                    });
+                }, 400);
+            });
         }
 
         function startCustomMusicLoops() {
@@ -489,7 +567,7 @@
                             triggerBombVibration();
                             player.lives = 0;
                             document.getElementById('life-val').innerText = player.lives;
-                            playGameOverSound();
+                            playScoreSequence();
                             gameState = "GAMEOVER";
                             document.getElementById('title-ui').style.display = 'block';
                             document.getElementById('title-header').innerText = "GAME OVER";
@@ -539,7 +617,7 @@
                             player.lives--;
                             document.getElementById('life-val').innerText = player.lives;
                             if (player.lives <= 0) {
-                                playGameOverSound();
+                                playGameOverSequence();
                                 gameState = "GAMEOVER";
                                 document.getElementById('title-ui').style.display = 'block';
                                 document.getElementById('title-header').innerText = "GAME OVER";
