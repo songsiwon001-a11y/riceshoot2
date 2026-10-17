@@ -136,7 +136,7 @@
                 isNotNumAudioBuffer = await loadBuf('숫자가 아님.mp3');
                 pointIsAudioBuffer = await loadBuf('점입니다.mp3');
 
-                for (let n of [1,2,3,4,5,6,7,8,9,10,100,1000,10000]) {
+                for (let n of [0,1,2,3,4,5,6,7,8,9,10,100,1000,10000]) {
                     numAudioBuffers[n] = await loadBuf(n + '.mp3');
                 }
             } catch (e) {}
@@ -167,6 +167,7 @@
             try {
                 const source = audioCtx.createBufferSource();
                 source.buffer = buffer;
+                source.loop = false;
                 const gainNode = audioCtx.createGain();
                 gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime);
                 source.connect(gainNode);
@@ -271,7 +272,7 @@
         function playScoreNumberSequence(scoreVal) {
             if (scoreVal > 99999999) {
                 playExternalAudioBuffer(isNotNumAudioBuffer, () => {
-                    setTimeout(() => playExternalAudioBuffer(pointIsAudioBuffer), 200);
+                    setTimeout(() => playExternalAudioBuffer(pointIsAudioBuffer), 300);
                 });
                 return;
             }
@@ -308,15 +309,19 @@
             const playNextPart = () => {
                 if (index < parts.length) {
                     let key = parts[index];
-                    let buf = key === 0 ? numAudioBuffers[0] : numAudioBuffers[key];
+                    let buf = numAudioBuffers[key];
                     index++;
-                    playExternalAudioBuffer(buf, () => {
-                        setTimeout(playNextPart, 150);
-                    });
+                    if (buf) {
+                        playExternalAudioBuffer(buf, () => {
+                            setTimeout(playNextPart, 220);
+                        });
+                    } else {
+                        setTimeout(playNextPart, 50);
+                    }
                 } else {
                     setTimeout(() => {
                         playExternalAudioBuffer(pointIsAudioBuffer);
-                    }, 150);
+                    }, 300);
                 }
             };
             playNextPart();
@@ -330,7 +335,7 @@
                     playExternalAudioBuffer(finalScoreAudioBuffer, () => {
                         setTimeout(() => {
                             playScoreNumberSequence(score);
-                        }, 300);
+                        }, 3000);
                     });
                 }, 400);
             });
@@ -567,7 +572,7 @@
                             triggerBombVibration();
                             player.lives = 0;
                             document.getElementById('life-val').innerText = player.lives;
-                            playScoreSequence();
+                            playGameOverSequence();
                             gameState = "GAMEOVER";
                             document.getElementById('title-ui').style.display = 'block';
                             document.getElementById('title-header').innerText = "GAME OVER";
