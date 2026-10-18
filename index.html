@@ -272,7 +272,7 @@
         function playScoreNumberSequence(scoreVal) {
             if (scoreVal > 99999999) {
                 playExternalAudioBuffer(isNotNumAudioBuffer, () => {
-                    setTimeout(() => playExternalAudioBuffer(pointIsAudioBuffer), 300);
+                    setTimeout(() => playExternalAudioBuffer(pointIsAudioBuffer), 100);
                 });
                 return;
             }
@@ -313,15 +313,15 @@
                     index++;
                     if (buf) {
                         playExternalAudioBuffer(buf, () => {
-                            setTimeout(playNextPart, 220);
+                            setTimeout(playNextPart, 150);
                         });
                     } else {
-                        setTimeout(playNextPart, 50);
+                        setTimeout(playNextPart, 30);
                     }
                 } else {
                     setTimeout(() => {
                         playExternalAudioBuffer(pointIsAudioBuffer);
-                    }, 300);
+                    }, 100);
                 }
             };
             playNextPart();
@@ -331,13 +331,9 @@
             playCustomSample(whiteNoiseBuffer, 1.0, 5.0, 1.2, 1.0);
             playCustomSample(bassToneBuffer, 12.5, 20.0, 1.2, 0.9);
             playExternalAudioBuffer(gameOverAudioBuffer, () => {
-                setTimeout(() => {
-                    playExternalAudioBuffer(finalScoreAudioBuffer, () => {
-                        setTimeout(() => {
-                            playScoreNumberSequence(score);
-                        }, 3000);
-                    });
-                }, 400);
+                playExternalAudioBuffer(finalScoreAudioBuffer, () => {
+                    playScoreNumberSequence(score);
+                });
             });
         }
 
