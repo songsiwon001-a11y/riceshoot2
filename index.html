@@ -107,13 +107,9 @@
         const spaceBassSeq = [
             "C2", "C2", "C2", "C2", "C2", "C2", "C2", "C2",
             "A#1", "A#1", "A#1", "A#1", "A#1", "A#1", "A#1", "A#1",
-            "G#1", "G#1", "G#1", "G#1", "G#1", "G#1", "G#1",
+            "G#1", "G#1", "G#1", "G#1", "G#1", "G#1", "G#1", "G#1",
             "G1", "G1", "G1", "G1", "G1", "G1", "G1", "G1"
         ];
-        const spacePulse6Seq = [null, "C5", null, "E5", null, "G5", null, "A5"];
-        const spacePulse25Seq = ["C3", "E2", "G2", "A2", "C3", "E2", "G2", "A2"];
-        const spaceNoiseSeq = [true, false, false, true, false, true, false, false];
-        const spaceShortNoiseSeq = [false, false, true, false, false, false, true, false];
         let spaceStep = 0;
         let spaceMusicIntervalId = null;
 
@@ -173,7 +169,10 @@
         }
 
         function playExternalAudioBuffer(buffer, onEnded = null) {
-            if (!buffer || !audioCtx) return;
+            if (!buffer || !audioCtx) {
+                if (onEnded) onEnded();
+                return;
+            }
             try {
                 const source = audioCtx.createBufferSource();
                 source.buffer = buffer;
@@ -282,7 +281,7 @@
         function playScoreNumberSequence(scoreVal) {
             if (scoreVal > 99999999) {
                 playExternalAudioBuffer(isNotNumAudioBuffer, () => {
-                    setTimeout(() => playExternalAudioBuffer(pointIsAudioBuffer), 100);
+                    playExternalAudioBuffer(pointIsAudioBuffer);
                 });
                 return;
             }
@@ -322,16 +321,12 @@
                     let buf = numAudioBuffers[key];
                     index++;
                     if (buf) {
-                        playExternalAudioBuffer(buf, () => {
-                            setTimeout(playNextPart, 150);
-                        });
+                        playExternalAudioBuffer(buf, playNextPart);
                     } else {
-                        setTimeout(playNextPart, 30);
+                        playNextPart();
                     }
                 } else {
-                    setTimeout(() => {
-                        playExternalAudioBuffer(pointIsAudioBuffer);
-                    }, 100);
+                    playExternalAudioBuffer(pointIsAudioBuffer);
                 }
             };
             playNextPart();
@@ -358,10 +353,10 @@
                     const p50Note = titleP50Seq[idx];
                     if (p50Note) playCustomSample(pulse50Buffer, 80.0, noteFreqs[p50Note] || 523.25, 0.25, 0.35);
 
-                    const bassNote = titleBassSeq[idx];
+                    const bassNote = titleBassSeq[idx % titleBassSeq.length];
                     if (bassNote) playCustomSample(bassToneBuffer, 12.5, noteFreqs[bassNote] || 261.63, 0.25, 0.6);
 
-                    const maneNote = titleManeSeq[idx];
+                    const maneNote = titleManeSeq[idx % titleManeSeq.length];
                     if (maneNote) playCustomSample(manePulseBuffer, 26.0, noteFreqs[maneNote] || 392.00, 0.25, 0.4);
 
                     titleStep++;
@@ -376,27 +371,12 @@
                     if (mNote) {
                         const mHz = noteFreqs[mNote] || 261.63;
                         playCustomSample(manePulseBuffer, 26.0, mHz, 0.15, 0.4);
-                        const p25Note = spacePulse25Seq[idx % spacePulse25Seq.length];
-                        if (p25Note) {
-                            playCustomSample(pulse25Buffer, 11.5, (noteFreqs[p25Note] || 130.81) * (mHz / 261.63), 0.15, 0.25);
-                        }
+                        playCustomSample(pulse25Buffer, 11.5, mHz, 0.15, 0.25);
                     }
 
                     const bNote = spaceBassSeq[idx % spaceBassSeq.length];
-                    if (bNote) playCustomSample(bassToneBuffer, 12.5, noteFreqs[bNote] || 65.41, 0.15, 0.65);
-
-                    const p6Note = spacePulse6Seq[idx % spacePulse6Seq.length];
-                    if (p6Note) playCustomSample(pulse6Buffer, 10.0, noteFreqs[p6Note] || 523.25, 0.12, 0.3);
-
-                    const p50Note = spaceManeSeq[(idx + 2) % spaceManeSeq.length];
-                    if (p50Note) playCustomSample(pulse50Buffer, 80.0, noteFreqs[p50Note] || 261.63, 0.15, 0.3);
-
-                    if (spaceNoiseSeq[idx % spaceNoiseSeq.length]) {
-                        playCustomSample(whiteNoiseBuffer, 1.0, 25.0, 0.08, 0.2);
-                    }
-
-                    if (spaceShortNoiseSeq[idx % spaceShortNoiseSeq.length]) {
-                        playCustomSample(shortNoiseBuffer, 3.0, 350.0, 0.06, 0.4);
+                    if (bNote) {
+                        playCustomSample(bassToneBuffer, 12.5, noteFreqs[bNote] || 65.41, 0.15, 0.65);
                     }
 
                     spaceStep++;
