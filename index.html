@@ -85,21 +85,31 @@
         let idleTimer = 0;
 
         const noteFreqs = { 
-            "A2": 110.0, "G2": 98.0, "E2": 82.41, "C2": 65.41, 
-            "D2": 73.42, "C3": 130.81, "B2": 123.47, "F2": 87.31,
-            "C5": 523.25, "D5": 587.33, "E5": 659.25, "G5": 783.99, "A5": 880.0
+            "G1": 49.00, "G#1": 51.91, "A#1": 58.27, "C2": 65.41,
+            "D2": 73.42, "E2": 82.41, "F2": 87.31, "G2": 98.00, "A2": 110.00, "B2": 123.47,
+            "G3": 196.00, "G#3": 207.65, "A#3": 233.08, "B3": 246.94,
+            "C4": 261.63, "D4": 293.66, "D#4": 311.13, "E4": 329.63, "F4": 349.23, "G4": 392.00, "A4": 440.00, "B4": 493.88,
+            "C5": 523.25, "D5": 587.33, "E5": 659.25, "F5": 698.46, "G5": 783.99, "A5": 880.00, "B5": 987.77
         };
 
-        const bassNotesSeq = ["A2", "A2", "G2", "G2", "E2", "E2", "C2", "D2", "A2", "A2", "G2", "G2", "C3", "B2", "G2", "E2"];
-        let bassStep = 0;
-        let bassIntervalId = null;
+        const titleP50Seq = ["C5", "D5", "E5", "F5", "G5", "F5", "E5", "D5", "E5", "F5", "G5", "A5", "B5", "A5", "G5", "F5"];
+        const titleBassSeq = ["C4", "C4", "C4", "C4", "E4", "E4", "E4", "E4", "F4", "F4", "F4", "F4", "G4", "G4", "G4", "G4"];
+        const titleManeSeq = ["G4", "B4", "C5", "B4", "C5", "D5", "C5", "G4", "F4", "C5", "F4", "C5", "G5", "F5", "D5", "B4"];
+        let titleStep = 0;
+        let titleMusicIntervalId = null;
 
-        const melodyNotesSeq = ["E5", "G5", "A5", null, "A5", "G5", "E5", "C5", "D5", "D5", "E5", "G5", "A5", null, "G5", "A5"];
-        let melodyStep = 0;
-        let melodyIntervalId = null;
-
-        const spaceBassSeq = ["A2", "E2", "C2", "G2", "F2", "C2", "D2", "E2"];
-        const spaceManeSeq = ["E5", null, "A5", "C5", "G5", null, "E5", "A5"];
+        const spaceManeSeq = [
+            "C4", "D#4", "G4", "D#4", "G4", "D#4", "G4", "D#4",
+            "A#3", "D4", "G4", "D4", "G4", "D4", "G4", "D4",
+            "G#3", "C4", "G4", "C4", "G4", "C4", "G4", "C4",
+            "G3", "B3", "G4", "F4", "G4", "F4", "G4", "F4"
+        ];
+        const spaceBassSeq = [
+            "C2", "C2", "C2", "C2", "C2", "C2", "C2", "C2",
+            "A#1", "A#1", "A#1", "A#1", "A#1", "A#1", "A#1", "A#1",
+            "G#1", "G#1", "G#1", "G#1", "G#1", "G#1", "G#1",
+            "G1", "G1", "G1", "G1", "G1", "G1", "G1", "G1"
+        ];
         const spacePulse6Seq = [null, "C5", null, "E5", null, "G5", null, "A5"];
         const spacePulse25Seq = ["C3", "E2", "G2", "A2", "C3", "E2", "G2", "A2"];
         const spaceNoiseSeq = [true, false, false, true, false, true, false, false];
@@ -338,64 +348,60 @@
         }
 
         function startCustomMusicLoops() {
-            if (bassIntervalId) clearInterval(bassIntervalId);
-            if (melodyIntervalId) clearInterval(melodyIntervalId);
+            if (titleMusicIntervalId) clearInterval(titleMusicIntervalId);
             if (spaceMusicIntervalId) clearInterval(spaceMusicIntervalId);
 
-            const intervalMs = (60 / 135) * 1000 * 0.5;
-
-            bassIntervalId = setInterval(() => {
+            titleMusicIntervalId = setInterval(() => {
                 if (gameState === "TITLE_SCREEN" || gameState === "DEMO") {
-                    const note = bassNotesSeq[bassStep % bassNotesSeq.length];
-                    playCustomSample(bassToneBuffer, 12.5, noteFreqs[note] || 110.0, 0.35, 0.7);
-                    bassStep++;
-                }
-            }, intervalMs);
+                    const idx = titleStep % titleP50Seq.length;
+                    
+                    const p50Note = titleP50Seq[idx];
+                    if (p50Note) playCustomSample(pulse50Buffer, 80.0, noteFreqs[p50Note] || 523.25, 0.25, 0.35);
 
-            melodyIntervalId = setInterval(() => {
-                if (gameState === "TITLE_SCREEN" || gameState === "DEMO") {
-                    const note = melodyNotesSeq[melodyStep % melodyNotesSeq.length];
-                    if (note) {
-                        playCustomSample(manePulseBuffer, 26.0, noteFreqs[note] || 659.25, 0.15, 0.4);
-                    }
-                    melodyStep++;
+                    const bassNote = titleBassSeq[idx];
+                    if (bassNote) playCustomSample(bassToneBuffer, 12.5, noteFreqs[bassNote] || 261.63, 0.25, 0.6);
+
+                    const maneNote = titleManeSeq[idx];
+                    if (maneNote) playCustomSample(manePulseBuffer, 26.0, noteFreqs[maneNote] || 392.00, 0.25, 0.4);
+
+                    titleStep++;
                 }
-            }, intervalMs);
+            }, 250);
 
             spaceMusicIntervalId = setInterval(() => {
                 if (gameState === "PLAYING") {
-                    const idx = spaceStep % spaceBassSeq.length;
+                    const idx = spaceStep % spaceManeSeq.length;
                     
-                    const bNote = spaceBassSeq[idx];
-                    playCustomSample(bassToneBuffer, 12.5, noteFreqs[bNote] || 82.41, 0.25, 0.6);
-
                     const mNote = spaceManeSeq[idx];
                     if (mNote) {
-                        const mHz = noteFreqs[mNote] || 659.25;
-                        playCustomSample(manePulseBuffer, 26.0, mHz, 0.15, 0.35);
-                        const p25Note = spacePulse25Seq[idx];
+                        const mHz = noteFreqs[mNote] || 261.63;
+                        playCustomSample(manePulseBuffer, 26.0, mHz, 0.15, 0.4);
+                        const p25Note = spacePulse25Seq[idx % spacePulse25Seq.length];
                         if (p25Note) {
-                            playCustomSample(pulse25Buffer, 11.5, (noteFreqs[p25Note] || 400.0) * (mHz / 659.25), 0.2, 0.25);
+                            playCustomSample(pulse25Buffer, 11.5, (noteFreqs[p25Note] || 130.81) * (mHz / 261.63), 0.15, 0.25);
                         }
                     }
 
-                    const p6Note = spacePulse6Seq[idx];
+                    const bNote = spaceBassSeq[idx % spaceBassSeq.length];
+                    if (bNote) playCustomSample(bassToneBuffer, 12.5, noteFreqs[bNote] || 65.41, 0.15, 0.65);
+
+                    const p6Note = spacePulse6Seq[idx % spacePulse6Seq.length];
                     if (p6Note) playCustomSample(pulse6Buffer, 10.0, noteFreqs[p6Note] || 523.25, 0.12, 0.3);
 
-                    const p50Note = spaceBassSeq[(idx + 2) % spaceBassSeq.length];
-                    playCustomSample(pulse50Buffer, 80.0, noteFreqs[p50Note] || 98.0, 0.15, 0.3);
+                    const p50Note = spaceManeSeq[(idx + 2) % spaceManeSeq.length];
+                    if (p50Note) playCustomSample(pulse50Buffer, 80.0, noteFreqs[p50Note] || 261.63, 0.15, 0.3);
 
-                    if (spaceNoiseSeq[idx]) {
+                    if (spaceNoiseSeq[idx % spaceNoiseSeq.length]) {
                         playCustomSample(whiteNoiseBuffer, 1.0, 25.0, 0.08, 0.2);
                     }
 
-                    if (spaceShortNoiseSeq[idx]) {
+                    if (spaceShortNoiseSeq[idx % spaceShortNoiseSeq.length]) {
                         playCustomSample(shortNoiseBuffer, 3.0, 350.0, 0.06, 0.4);
                     }
 
                     spaceStep++;
                 }
-            }, intervalMs);
+            }, 150);
         }
 
         let player = { x: 280, y: 680, w: 42, h: 42, invincible: false, invincibleTimer: 0, lives: 5 };
