@@ -72,7 +72,7 @@
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         let audioCtx;
-        let bassToneBuffer, manePulseBuffer, shortNoiseBuffer, pulse6Buffer, pulse25Buffer, pulse50Buffer, whiteNoiseBuffer;
+        let bassToneBuffer, manePulseBuffer, shortNoiseBuffer, pulse6Buffer, pulse25Buffer, pulse50Buffer, whiteNoiseBuffer, sawtoothWaveBuffer;
         let gameOverAudioBuffer = null;
         let stageClearAudioBuffer = null;
         let helloAudioBuffer = null;
@@ -88,8 +88,8 @@
             "G1": 49.00, "G#1": 51.91, "A#1": 58.27, "C2": 65.41,
             "D2": 73.42, "E2": 82.41, "F2": 87.31, "G2": 98.00, "A2": 110.00, "B2": 123.47,
             "G3": 196.00, "G#3": 207.65, "A#3": 233.08, "B3": 246.94,
-            "C4": 261.63, "D4": 293.66, "D#4": 311.13, "E4": 329.63, "F4": 349.23, "G4": 392.00, "A4": 440.00, "B4": 493.88,
-            "C5": 523.25, "D5": 587.33, "E5": 659.25, "F5": 698.46, "G5": 783.99, "A5": 880.00, "B5": 987.77
+            "C4": 261.63, "D4": 293.66, "D#4": 311.13, "E4": 329.63, "F4": 349.23, "G4": 392.00, "G#4": 415.30, "A4": 440.00, "A#4": 466.16, "B4": 493.88,
+            "C5": 523.25, "D5": 587.33, "D#5": 622.25, "E5": 659.25, "F5": 698.46, "G5": 783.99, "G#5": 830.61, "A5": 880.00, "B5": 987.77
         };
 
         const titleP50Seq = ["C5", "D5", "E5", "F5", "G5", "F5", "E5", "D5", "E5", "F5", "G5", "A5", "B5", "A5", "G5", "F5"];
@@ -109,6 +109,18 @@
             "A#1", "A#1", "A#1", "A#1", "A#1", "A#1", "A#1", "A#1",
             "G#1", "G#1", "G#1", "G#1", "G#1", "G#1", "G#1", "G#1",
             "G1", "G1", "G1", "G1", "G1", "G1", "G1", "G1"
+        ];
+        const spaceSawSeq = [
+            "C5", "D#5", "D#5", "C5", "C5", "D#5", "D#5", "C5",
+            "A#4", "D#5", "D#5", "A#4", "A#4", "D#5", "D#5", "D#5",
+            "A#4", "G#4", "G#5", "G#5", "G#4", "G#4", "G#5", "G#5",
+            "G#4", "G4", "G5", "G5", "G4", "G4", "G5", "G5"
+        ];
+        const spaceNoiseRateSeq = [
+            8, 64, 64, 8, 8, 64, 64, 8,
+            8, 64, 64, 8, 8, 64, 64, 8,
+            8, 64, 64, 8, 8, 64, 64, 8,
+            8, 64, 64, 8, 8, 64, 64, 8
         ];
         let spaceStep = 0;
         let spaceMusicIntervalId = null;
@@ -134,6 +146,7 @@
                 pulse25Buffer = await loadBuf('pulse_25.wav');
                 pulse50Buffer = await loadBuf('pulse_50.wav');
                 whiteNoiseBuffer = await loadBuf('whitenoise.wav');
+                sawtoothWaveBuffer = await loadBuf('sawtooth_wave.wav');
                 gameOverAudioBuffer = await loadBuf('game_over.mp3');
                 stageClearAudioBuffer = await loadBuf('stage_clear.mp3');
                 helloAudioBuffer = await loadBuf('안녕하세요.mp3');
@@ -157,6 +170,25 @@
                 source.playbackRate.value = playbackRate;
 
                 const duration = Math.min((buffer.duration / playbackRate), maxDuration);
+                const gainNode = audioCtx.createGain();
+                gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+                source.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                source.start(audioCtx.currentTime);
+                source.stop(audioCtx.currentTime + duration);
+            } catch(e) {}
+        }
+
+        function playNoiseByRate(rateMult, maxDuration = 0.05, volume = 0.4) {
+            if (!whiteNoiseBuffer || !audioCtx) return;
+            try {
+                const source = audioCtx.createBufferSource();
+                source.buffer = whiteNoiseBuffer;
+                source.playbackRate.value = rateMult;
+
+                const duration = Math.min((whiteNoiseBuffer.duration / rateMult), maxDuration);
                 const gainNode = audioCtx.createGain();
                 gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
                 gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
@@ -377,6 +409,16 @@
                     const bNote = spaceBassSeq[idx % spaceBassSeq.length];
                     if (bNote) {
                         playCustomSample(bassToneBuffer, 12.5, noteFreqs[bNote] || 65.41, 0.15, 0.65);
+                    }
+
+                    const sawNote = spaceSawSeq[idx % spaceSawSeq.length];
+                    if (sawNote) {
+                        playCustomSample(sawtoothWaveBuffer, 50.0, noteFreqs[sawNote] || 523.25, 0.15, 1.0);
+                    }
+
+                    const nRate = spaceNoiseRateSeq[idx % spaceNoiseRateSeq.length];
+                    if (nRate) {
+                        playNoiseByRate(nRate, 0.05, 0.4);
                     }
 
                     spaceStep++;
